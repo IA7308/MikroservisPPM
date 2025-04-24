@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'book' => [
+        'url' => env('DOCBOOKAUTHOR_SERVICE_URL', 'http://127.0.0.1:8000'),
+    ],
+    'profile_author' => [
+        'url' => env('PROFILEAUTHOR_SERVICE_URL', 'http://127.0.0.1:8001'),
+    ],
+
 ];

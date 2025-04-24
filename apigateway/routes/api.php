@@ -1,8 +1,11 @@
 <?php
 
+use App\Http\Controllers\GatewayController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/user', function (Request $request) {
-    return $request->user();
-})->middleware('auth:sanctum');
+Route::prefix('doc-book-author')->group(function () {
+    Route::get('/', [GatewayController::class, 'index']);
+    Route::get('/{id}', [GatewayController::class, 'findByID']);
+    Route::post('/', [GatewayController::class, 'storeBook']);
+});

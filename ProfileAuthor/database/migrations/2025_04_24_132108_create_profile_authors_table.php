@@ -29,7 +29,7 @@ return new class extends Migration
             $table->float('sinta_score_v3_3year');
             $table->float('affiliation_score_v3_overall');
             $table->float('affiliation_score_v3_3year');
-            $table->string('image');
+            $table->string('image')->nullable();
             $table->timestamps();
         });
     }

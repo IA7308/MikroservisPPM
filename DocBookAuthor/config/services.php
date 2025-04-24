@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'profile_author' => [
+        'url' => env('PROFILEAUTHOR_SERVICE_URL', 'http://127.0.0.1:8001'),
+    ],
+
 ];

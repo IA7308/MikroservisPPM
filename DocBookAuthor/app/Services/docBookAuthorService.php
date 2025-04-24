@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\DocBookAuthor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 
 class DocBookAuthorService
@@ -100,23 +101,13 @@ class DocBookAuthorService
             $category = $request->query('category');
             $items = $request->query('items', 10);
 
-            $docBookAuthor = DocBookAuthor::with([
-                'profileAuthor' => function ($query) {
-                    $query->select('id', 'nidn', 'fullname', 'gelar_depan', 'gelar_belakang', 'country', 'image', 'programs_id');
-                },
-                'profileAuthor.program' => function ($query) {
-                    $query->select('code_pddikti', 'faculty_id', 'name_id', 'name_en');
-                },
-            ])
-            ->when($keyword, function ($query) use ($keyword) {
-                $query->where(function ($q) use ($keyword) {
-                    $q->where('title', 'like', "%$keyword%")
-                        ->orWhere('authors', 'like', "%$keyword%")
-                        ->orWhereHas('profileAuthor', function ($q) use ($keyword) {
-                            $q->where('fullname', 'like', "%$keyword%");
-                        });
-                });
-            })
+            $docBookAuthor = DocBookAuthor::query()
+                ->when($keyword, function ($query) use ($keyword) {
+                    $query->where(function ($q) use ($keyword) {
+                        $q->where('title', 'like', "%$keyword%")
+                            ->orWhere('authors', 'like', "%$keyword%");
+                    });
+                })
                 ->when($year, function ($query, $year) {
                     return $query->where('year', $year);
                 })
@@ -124,6 +115,63 @@ class DocBookAuthorService
                     return $query->where('category', 'like', "%$category%");
                 })
                 ->paginate($items);
+
+            $authorIds = $docBookAuthor->pluck('author_id')->unique()->toArray();
+
+            $profileAuthors = [];
+            if (!empty($authorIds)) {
+                $profileResponse = Http::get(env('PROFILEAUTHOR_SERVICE_URL').'/api/profile-author', [
+                    'ids' => implode(',', $authorIds)
+                ]);
+                
+                if ($profileResponse->successful()) {
+                    $profileAuthors = collect($profileResponse->json()['data'] ?? [])
+                        ->keyBy('id');
+                }
+            }
+
+            $programIds = collect($profileAuthors)->pluck('programs_id')->unique()->filter()->toArray();
+
+            $programs = [];
+            if (!empty($programIds)) {
+                $programResponse = Http::get(env('PROFILEAUTHOR_SERVICE_URL').'/api/profile-author', [
+                    'ids' => implode(',', $programIds)
+                ]);
+                
+                if ($programResponse->successful()) {
+                    $programs = collect($programResponse->json()['data'] ?? [])
+                        ->keyBy('code_pddikti');
+                }
+            }
+
+            $transformedData = $docBookAuthor->getCollection()->map(function ($item) use ($profileAuthors, $programs) {
+                $authorData = $profileAuthors[$item->author_id] ?? null;
+                $programData = $authorData ? ($programs[$authorData['programs_id']] ?? null) : null;
+                
+                return [
+                    'id' => $item->id,
+                    'title' => $item->title,
+                    'authors' => $item->authors,
+                    'year' => $item->year,
+                    'category' => $item->category,
+                    'profile_author' => $authorData ? [
+                        'nidn' => $authorData['nidn'],
+                        'fullname' => $authorData['fullname'],
+                        'gelar_depan' => $authorData['gelar_depan'],
+                        'gelar_belakang' => $authorData['gelar_belakang'],
+                        'country' => $authorData['country'],
+                        'image' => $authorData['image'],
+                    ] : null,
+                    'program' => $programData ? [
+                        'code_pddikti' => $programData['code_pddikti'],
+                        'name_id' => $programData['name_id'],
+                        'name_en' => $programData['name_en'],
+                    ] : null
+                ];
+            });
+
+            // Set collection yang sudah ditransformasi
+            $docBookAuthor->setCollection($transformedData);
 
             return response()->json([
                 'message' => 'Doc Book Author retrieved successfully',

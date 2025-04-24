@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Http;
 
 class docBookAuthor extends Model
 {
@@ -27,7 +28,8 @@ class docBookAuthor extends Model
 
     public function getProfileAuthorAttribute()
     {
-        $response = Http::get('http://127.0.0.1/api/profile-author/' . $this->author_id);
+        $profileAuthorServiceUrl = config('services.profile_author.url');
+        $response = Http::get("{$profileAuthorServiceUrl}/api/profile-author/" . $this->author_id);
         return $response->json();
     }
 }
