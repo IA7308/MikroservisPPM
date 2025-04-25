@@ -79,4 +79,30 @@ class DocBookAuthorService
             return ['error' => 'DocBookAuthor service unavailable'];
         }            
     }
+
+    public function updateBookDocService(Request $request, $id)
+    {
+        try {
+            $response = Http::timeout(5)
+                ->put("{$this->baseUrl}/api/doc-book-author/{$id}", $request->all());
+                
+            return $response->json();
+        } catch (\Exception $e) {
+            Log::error("DocBookAuthor service error: " . $e->getMessage());
+            return ['error' => 'DocBookAuthor service unavailable'];
+        }            
+    }
+
+    public function deleteBookDocService($id)
+    {
+        try {
+            $response = Http::timeout(5)
+                ->delete("{$this->baseUrl}/api/doc-book-author/{$id}");
+                
+            return $response->json();
+        } catch (\Exception $e) {
+            Log::error("DocBookAuthor service error: " . $e->getMessage());
+            return ['error' => 'DocBookAuthor service unavailable'];
+        }            
+    }
 }

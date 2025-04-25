@@ -35,6 +35,14 @@ class GatewayController extends Controller
     {
         return $this->productService->createBookDocService($request);
     }
+    public function updateBook(Request $request, $id)
+    {
+        return $this->productService->updateBookDocService($request, $id);
+    }
+    public function deleteBook($id)
+    {
+        return $this->productService->deleteBookDocService($id);
+    }
 
     // public function getOrder($id)
     // {
