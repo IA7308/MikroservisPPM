@@ -48,37 +48,77 @@ class DocBookAuthorService
             ]));
 
             $docBookAuthor = Cache::remember($cacheKey, 300, function () use ($keyword, $year, $category, $items) {
-                $query = DocBookAuthor::with([
-                    'profileAuthor' => function ($query) {
-                        $query->select('id', 'nidn', 'fullname', 'gelar_depan', 'gelar_belakang', 'country', 'image', 'programs_id');
-                    },
-                    'profileAuthor.program' => function ($query) {
-                        $query->select('code_pddikti', 'faculty_id', 'name_id', 'name_en');
-                    }
-                ]);
-        
+                $query = DocBookAuthor::query();
+                
                 // Filter berdasarkan keyword
                 if ($keyword) {
                     $query->where(function ($q) use ($keyword) {
                         $q->where('title', 'like', "%$keyword%")
-                          ->orWhere('authors', 'like', "%$keyword%")
-                          ->orWhereHas('profileAuthor', function ($q) use ($keyword) {
-                              $q->where('fullname', 'like', "%$keyword%");
-                          });
+                        ->orWhere('authors', 'like', "%$keyword%");
                     });
                 }
-        
+                
                 // Filter berdasarkan tahun
                 if ($year) {
                     $query->where('year', $year);
                 }
-        
+                
                 // Filter berdasarkan kategori
                 if ($category) {
                     $query->where('category', 'like', "%$category%");
                 }
-        
-                return $query->paginate($items);
+                
+                $results = $query->paginate($items);
+
+                $profileIds = $results->pluck('profile_id')->unique()->filter()->toArray();
+    
+                if (!empty($profileIds)) {
+                    try {
+                        // Fetch profile data from ProfileService
+                        $profileResponse = Http::get(env('PROFILESERVICE_URL') . '/api/profiles', [
+                            'ids' => $profileIds,
+                            'fields' => 'id,nidn,fullname,gelar_depan,gelar_belakang,country,image,programs_id'
+                        ]);
+                        
+                        $profiles = $profileResponse->successful() ? $profileResponse->json() : [];
+                        
+                        // Fetch program data from ProfileProgramService
+                        $programIds = collect($profiles)->pluck('programs_id')->unique()->filter()->toArray();
+                        
+                        if (!empty($programIds)) {
+                            $programResponse = Http::get(env('PROFILEPROGRAMSERVICE_URL') . '/api/programs', [
+                                'ids' => $programIds,
+                                'fields' => 'code_pddikti,faculty_id,name_id,name_en'
+                            ]);
+                            
+                            $programs = $programResponse->successful() ? $programResponse->json() : [];
+                            
+                            // Map programs to their IDs for easy access
+                            $programsMap = collect($programs)->keyBy('id');
+                        }
+                        
+                        // Map profiles to their IDs and attach programs
+                        $profilesMap = collect($profiles)->map(function ($profile) use ($programsMap) {
+                            if (isset($profile['programs_id']) && isset($programsMap[$profile['programs_id']])) {
+                                $profile['program'] = $programsMap[$profile['programs_id']];
+                            }
+                            return $profile;
+                        })->keyBy('id');
+                        
+                        // Attach profiles to the results
+                        $results->getCollection()->transform(function ($item) use ($profilesMap) {
+                            if (isset($item->profile_id) && isset($profilesMap[$item->profile_id])) {
+                                $item->profileAuthor = $profilesMap[$item->profile_id];
+                            }
+                            return $item;
+                        });
+                    } catch (\Exception $e) {
+                        // Log error if needed
+                        \Log::error('Failed to fetch profile data: ' . $e->getMessage());
+                    }
+                }
+                
+                return $results;
             });
             return response()->json([
                 'message' => 'Doc Book Author retrieved successfully',
@@ -134,7 +174,7 @@ class DocBookAuthorService
 
             $programs = [];
             if (!empty($programIds)) {
-                $programResponse = Http::get(env('PROFILEAUTHOR_SERVICE_URL').'/api/profile-author', [
+                $programResponse = Http::get(env('PROFILEAUTHOR_SERVICE_URL').'/api/profile-program', [
                     'ids' => implode(',', $programIds)
                 ]);
                 

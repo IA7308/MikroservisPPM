@@ -34,15 +34,9 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
-
-    'book' => [
-        'url' => env('DOCBOOKAUTHOR_SERVICE_URL', 'http://127.0.0.1:8000'),
-    ],
+    
     'profile_author' => [
         'url' => env('PROFILEAUTHOR_SERVICE_URL', 'http://127.0.0.1:8001'),
-    ],
-    'garuda' => [
-        'url' => env('DOCGARUDAAUTHOR_SERVICE_URL', 'http://127.0.0.1:8004'),
     ],
 
 ];
